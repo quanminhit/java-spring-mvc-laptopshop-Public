@@ -1,12 +1,24 @@
-package vn.hoidanit.laptopshop.controller;
+package vn.hoidanit.laptopshop.controller.admin;
 
 import vn.hoidanit.laptopshop.domain.User;
+import vn.hoidanit.laptopshop.service.UploadFileService;
 import vn.hoidanit.laptopshop.service.UserService;
+
+import java.util.List;
+
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 
@@ -14,16 +26,21 @@ import org.springframework.web.bind.annotation.PostMapping;
 public class UserController {
 
     private final UserService userService;
+    private final UploadFileService uploadFileService;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, UploadFileService uploadFileService,
+            PasswordEncoder passwordEncoder) {
         this.userService = userService;
+        this.uploadFileService = uploadFileService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/admin/user")
     public String getUserPage(Model model) {
         model.addAttribute("users", this.userService.getUsers());
         System.out.println(this.userService.getUsers());
-        return "admin/user/table-user";
+        return "admin/user/show";
     }
 
     @GetMapping("/admin/user/create")
@@ -32,15 +49,21 @@ public class UserController {
         return "admin/user/createUser";
     }
 
-    @PostMapping("/admin/user/create")
-    public String createAdmin(Model model, @ModelAttribute("newUser") User user) {
-        System.out.println("Model User: " + user);
+    @PostMapping(value = "/admin/user/create")
+    public String createUserPage(Model model,
+            @ModelAttribute("newUser") @Valid User user, BindingResult bindingResult,
+            @RequestParam("imgFile") MultipartFile file) {
+        List<FieldError> errors = bindingResult.getFieldErrors();
+        for (FieldError error : errors) {
+            System.out.println(error.getField() + " - " + error.getDefaultMessage());
+        }
+        if (bindingResult.hasErrors()) {
+            return "admin/user/createUser";
+        }
+        String avatar = this.uploadFileService.handleSaveFile(file, "avatar");
+        user.setAvatar(avatar);
+        user.setRole(this.userService.getRoleByName(user.getRole().getName()));
         this.userService.create(user);
-        return "redirect:/admin/user";
-    }
-
-    @GetMapping("/")
-    public String getAllUsers() {
         return "redirect:/admin/user";
     }
 
